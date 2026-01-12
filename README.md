@@ -22,7 +22,7 @@ This extension automatically converts HEIC files to JPEG format when pasted or d
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/your-username/github-heic-to-jpeg-extension.git
+   git clone https://github.com/kazumanagano/github-heic-to-jpeg-extension.git
    cd github-heic-to-jpeg-extension
    ```
 
