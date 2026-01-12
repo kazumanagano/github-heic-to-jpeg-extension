@@ -2,6 +2,8 @@
 
 A Chrome extension that solves the problem of uploading images saved by clipboard management apps like [Paste.app](https://pasteapp.io/) on macOS to GitHub Issues and Pull Requests, which fail because they are in HEIC format.
 
+![Demo](demo.gif)
+
 ## Background
 
 Since macOS Sequoia, images saved by Paste.app are stored in HEIC (High Efficiency Image Container) format. However, GitHub does not support HEIC image uploads, resulting in the following error:
