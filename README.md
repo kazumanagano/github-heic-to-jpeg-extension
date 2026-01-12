@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="banner.png" alt="GitHub HEIC to JPEG Extension" width="800">
+</p>
+
 # GitHub HEIC to JPEG Converter
 
 A Chrome extension that solves the problem of uploading images saved by clipboard management apps like [Paste.app](https://pasteapp.io/) on macOS to GitHub Issues and Pull Requests, which fail because they are in HEIC format.
