@@ -95,7 +95,7 @@ src/
 
 ### Why Sandbox is Required
 
-HEIC to JPEG conversion uses the [heic2any](https://github.com/nicostromberg/heic2any) library. This library internally uses WebAssembly (libheif), and runs inside a sandboxed iframe to bypass Chrome extension Content Security Policy (CSP) restrictions.
+HEIC to JPEG conversion uses the [heic2any](https://github.com/alexcorvi/heic2any) library. This library internally uses WebAssembly (libheif), and runs inside a sandboxed iframe to bypass Chrome extension Content Security Policy (CSP) restrictions.
 
 ### Conversion Flow
 
@@ -113,5 +113,5 @@ MIT
 ## Related Links
 
 - [Paste.app](https://pasteapp.io/) - Clipboard manager for macOS
-- [heic2any](https://github.com/nicostromberg/heic2any) - HEIC conversion library
+- [heic2any](https://github.com/alexcorvi/heic2any) - HEIC conversion library
 - [GitHub - Supported file types](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/attaching-files)
