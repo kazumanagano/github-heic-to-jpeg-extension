@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>HEIC Converter Test Page</title>
+	<style>
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+			max-width: 800px;
+			margin: 50px auto;
+			padding: 20px;
+		}
+		textarea {
+			width: 100%;
+			height: 200px;
+			font-size: 14px;
+			padding: 10px;
+			border: 2px dashed #ccc;
+			border-radius: 8px;
+		}
+		textarea:focus {
+			border-color: #0366d6;
+			outline: none;
+		}
+		.drop-zone {
+			border: 2px dashed #ccc;
+			border-radius: 8px;
+			padding: 40px;
+			text-align: center;
+			margin: 20px 0;
+			transition: all 0.3s;
+		}
+		.drop-zone.dragover {
+			border-color: #0366d6;
+			background: #f0f7ff;
+		}
+		#result {
+			margin-top: 20px;
+			padding: 10px;
+			background: #f6f8fa;
+			border-radius: 8px;
+			min-height: 100px;
+		}
+		#result img {
+			max-width: 300px;
+			margin: 10px;
+		}
+		.info {
+			background: #e8f5e9;
+			padding: 10px;
+			border-radius: 4px;
+			margin-bottom: 20px;
+		}
+	</style>
+</head>
+<body>
+	<h1>HEIC Converter Test Page</h1>
+
+	<div class="info">
+		<strong>テスト方法:</strong>
+		<ol>
+			<li>HEICファイルをクリップボードにコピー</li>
+			<li>下のテキストエリアにペースト (Cmd+V / Ctrl+V)</li>
+			<li>または、ドロップゾーンにドラッグ&ドロップ</li>
+		</ol>
+	</div>
+
+	<h3>Paste Area (テキストエリア)</h3>
+	<textarea id="paste-area" placeholder="HEICファイルをここにペースト..."></textarea>
+
+	<h3>Drop Zone</h3>
+	<div id="drop-zone" class="drop-zone">
+		HEICファイルをここにドロップ
+	</div>
+
+	<h3>Result (変換結果)</h3>
+	<div id="result">
+		<p>変換された画像がここに表示されます...</p>
+	</div>
+
+	<script>
+		const pasteArea = document.getElementById('paste-area');
+		const dropZone = document.getElementById('drop-zone');
+		const result = document.getElementById('result');
+
+		// Track converted images
+		function showConvertedImage(file) {
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				// Clear result area safely
+				while (result.firstChild) {
+					result.removeChild(result.firstChild);
+				}
+
+				const info = document.createElement('p');
+				info.textContent = `✅ Converted: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+				result.appendChild(info);
+
+				const img = document.createElement('img');
+				img.src = e.target.result;
+				img.alt = file.name;
+				result.appendChild(img);
+			};
+			reader.readAsDataURL(file);
+		}
+
+		// Listen for paste events that bubble up from converted files
+		pasteArea.addEventListener('paste', (e) => {
+			const items = e.clipboardData?.items;
+			if (items) {
+				for (const item of items) {
+					if (item.type.startsWith('image/')) {
+						const file = item.getAsFile();
+						if (file && file.type === 'image/jpeg') {
+							showConvertedImage(file);
+						}
+					}
+				}
+			}
+		});
+
+		// Drop zone handling
+		dropZone.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			dropZone.classList.add('dragover');
+		});
+
+		dropZone.addEventListener('dragleave', () => {
+			dropZone.classList.remove('dragover');
+		});
+
+		dropZone.addEventListener('drop', (e) => {
+			e.preventDefault();
+			dropZone.classList.remove('dragover');
+
+			const items = e.dataTransfer?.items;
+			if (items) {
+				for (const item of items) {
+					if (item.type === 'image/jpeg') {
+						const file = item.getAsFile();
+						if (file) {
+							showConvertedImage(file);
+						}
+					}
+				}
+			}
+		});
+
+		console.log('Test page loaded. Ready for HEIC conversion testing.');
+	</script>
+</body>
+</html>

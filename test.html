@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Paste & Drop Simulation</title>
+    <style>
+        #comment-box {
+            width: 100%;
+            height: 200px;
+            border: 2px dashed #ccc;
+            padding: 10px;
+        }
+
+        #comment-box.dragover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>GitHub Paste & Drop Simulation</h1>
+    <textarea id="comment-box" placeholder="Paste or Drop your HEIC image here..."></textarea>
+    <div id="output"></div>
+
+    <script>
+        const textarea = document.getElementById('comment-box');
+        const output = document.getElementById('output');
+
+        textarea.addEventListener('paste', (event) => {
+            console.log('Paste event detected on textarea');
+            const items = event.clipboardData.items;
+            output.innerHTML += '<p>Paste event received.</p>';
+            processItems(items);
+        });
+
+        textarea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            textarea.classList.add('dragover');
+        });
+
+        textarea.addEventListener('dragleave', () => {
+            textarea.classList.remove('dragover');
+        });
+
+        textarea.addEventListener('drop', (event) => {
+            console.log('Drop event detected on textarea');
+            event.preventDefault();
+            textarea.classList.remove('dragover');
+            const items = event.dataTransfer.items;
+            output.innerHTML += '<p>Drop event received.</p>';
+            processItems(items);
+        });
+
+        function processItems(items) {
+            for (const item of items) {
+                output.innerHTML += `<p>Item type: ${item.type}</p>`;
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    output.innerHTML += `<p>File name: ${file.name}, Type: ${file.type}, Size: ${file.size}</p>`;
+
+                    if (file.type === 'image/jpeg') {
+                        const img = document.createElement('img');
+                        img.src = URL.createObjectURL(file);
+                        img.style.maxWidth = '200px';
+                        output.appendChild(img);
+                        output.innerHTML += '<p><strong>JPEG Image received successfully!</strong></p>';
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

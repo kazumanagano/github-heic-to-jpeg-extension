@@ -1,0 +1,35 @@
+{
+  "name": "github-heic-to-jpeg-extension",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "pnpm test:unit && pnpm test:e2e",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
+    "test:e2e": "pnpm build && playwright test",
+    "test:e2e:ui": "pnpm build && playwright test --ui",
+    "test:e2e:headed": "pnpm build && playwright test --headed",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "heic2any": "^0.0.4"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.3.0",
+    "@playwright/test": "^1.57.0",
+    "@vitest/coverage-v8": "^4.0.17",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^27.4.0",
+    "serve": "^14.2.5",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.17"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub HEIC to JPEG Converter",
+  "version": "1.0.0",
+  "description": "Automatically converts HEIC images to JPEG when pasted into GitHub.",
+  "permissions": [
+    "offscreen",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval' blob:; worker-src 'self' blob:; object-src 'self'"
+  },
+  "sandbox": {
+    "pages": ["sandbox.html"]
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*"
+      ],
+      "js": [
+        "src/content.js"
+      ]
+    }
+  ]
+}
