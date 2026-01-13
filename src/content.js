@@ -100,6 +100,12 @@ function waitForResult(requestId, timeout = 60000) {
 
 		const checkResult = async () => {
 			try {
+				// Check if extension context is still valid
+				if (!chrome?.storage?.local) {
+					reject(new Error('Extension context invalidated - please refresh the page'));
+					return;
+				}
+
 				const data = await chrome.storage.local.get(resultKey);
 				if (data[resultKey]) {
 					resolve(data[resultKey]);
@@ -173,6 +179,11 @@ async function handleDataTransfer(items, originalEvent, eventType) {
 
 			try {
 				console.log(`Converting ${file.name}...`);
+
+				// Check if extension context is still valid before storage access
+				if (!chrome?.storage?.local) {
+					throw new Error('Extension context invalidated');
+				}
 
 				const base64Data = await fileToBase64(file);
 				const requestId = Date.now().toString();
