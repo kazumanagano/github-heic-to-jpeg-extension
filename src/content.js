@@ -99,6 +99,12 @@ function waitForResult(requestId, timeout = 60000) {
 		const startTime = Date.now();
 
 		const checkResult = async () => {
+			// Check if extension context is still valid before each poll
+			if (!chrome?.runtime?.id) {
+				reject(new Error('Extension context invalidated during conversion. Please refresh the page.'));
+				return;
+			}
+
 			try {
 				const data = await chrome.storage.local.get(resultKey);
 				if (data[resultKey]) {
@@ -114,7 +120,12 @@ function waitForResult(requestId, timeout = 60000) {
 				// Poll every 500ms
 				setTimeout(checkResult, 500);
 			} catch (error) {
-				reject(error);
+				// Handle extension context invalidation specifically
+				if (error.message?.includes('Extension context') || !chrome?.runtime?.id) {
+					reject(new Error('Extension context invalidated during conversion. Please refresh the page.'));
+				} else {
+					reject(error);
+				}
 			}
 		};
 
@@ -225,8 +236,10 @@ async function handleDataTransfer(items, originalEvent, eventType) {
 				}
 
 				console.error('Conversion failed for', file.name, err);
-				if (err.message.includes('Extension context') || err.message.includes('invalidated') || !chrome?.runtime?.id) {
-					showErrorBanner('GitHub HEIC Converter: Extension updated or invalidated. Please REFRESH this page to use the new version.');
+				if (err.message?.includes('Extension context') || err.message?.includes('invalidated') || err.message?.includes('refresh') || !chrome?.runtime?.id) {
+					showErrorBanner('GitHub HEIC Converter: Extension context lost. Please REFRESH this page (Cmd+R / Ctrl+R) to restore functionality.');
+				} else {
+					showErrorBanner(`GitHub HEIC Converter: Failed to convert ${file.name}. Error: ${err.message}`);
 				}
 			}
 		}
