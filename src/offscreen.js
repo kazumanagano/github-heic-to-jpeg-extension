@@ -1,6 +1,6 @@
 import { getImage, saveImage } from './db.js';
 
-console.log('Offscreen script loaded (v7 - Queue)');
+console.log('Offscreen script loaded (v8 - Detailed Logging)');
 
 let sandboxFrame = null;
 let sandboxReady = false;
@@ -9,6 +9,16 @@ let pendingRequests = new Map();
 // Conversion queue to prevent sandbox reset during conversion
 let conversionQueue = [];
 let isProcessing = false;
+
+/**
+ * Format bytes to human readable string
+ */
+function formatBytes(bytes) {
+	if (!bytes) return '0 B';
+	if (bytes < 1024) return bytes + ' B';
+	if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+	return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
 
 // Reset sandbox iframe (cleanup for memory issues)
 function resetSandbox() {
@@ -81,22 +91,39 @@ window.addEventListener('message', (event) => {
  */
 async function processConversion(requestId) {
 	const requestKey = `request_${requestId}`;
+	const startTime = performance.now();
+	let fileName = 'unknown';
+	let dataSize = 0;
 
-	console.log(`Offscreen: Starting conversion for ${requestId}`);
+	const log = (msg) => {
+		const elapsed = (performance.now() - startTime).toFixed(0);
+		console.log(`Offscreen [${requestId}] (${elapsed}ms): ${msg}`);
+	};
+
+	log('Starting conversion');
 
 	// 1. Read from IndexedDB
-	console.log(`Reading request data for ${requestId} from IndexedDB...`);
+	log('Reading request data from IndexedDB...');
 	const data = await getImage(requestKey);
 
 	if (!data || !data.data) {
-		throw new Error('No image data found in IndexedDB');
+		throw new Error('[Offscreen Step 1] No image data found in IndexedDB - data may have been cleared');
 	}
 
+	fileName = data.fileName || 'unknown';
+	dataSize = data.data.length;
+	log(`Data loaded: ${fileName}, Size: ${formatBytes(dataSize)}`);
+
 	// 2. Setup sandbox if needed (will reuse existing if ready)
+	log('Setting up sandbox...');
 	await setupSandbox();
+	log('Sandbox ready');
 
 	// 3. Send to sandbox for conversion
-	console.log('Offscreen: Sending to sandbox for conversion...');
+	log('Sending to sandbox for conversion...');
+
+	const timeoutMs = dataSize > 10 * 1024 * 1024 ? 90000 : 60000; // 90s for >10MB base64
+	log(`Timeout set to ${timeoutMs/1000}s based on data size`);
 
 	const result = await new Promise((resolve, reject) => {
 		pendingRequests.set(requestId, resolve);
@@ -105,9 +132,10 @@ async function processConversion(requestId) {
 		setTimeout(() => {
 			if (pendingRequests.has(requestId)) {
 				pendingRequests.delete(requestId);
-				reject(new Error('Sandbox conversion timeout'));
+				const elapsed = (performance.now() - startTime).toFixed(0);
+				reject(new Error(`[Offscreen Step 3] Sandbox timeout after ${elapsed}ms (limit: ${timeoutMs}ms) - File: ${fileName}, Size: ${formatBytes(dataSize)}`));
 			}
-		}, 60000);
+		}, timeoutMs);
 
 		sandboxFrame.contentWindow.postMessage({
 			action: 'CONVERT_HEIC',
@@ -120,11 +148,13 @@ async function processConversion(requestId) {
 	if (!result.success) {
 		// Reset sandbox on error
 		resetSandbox();
-		throw new Error(result.error || 'Conversion failed in sandbox');
+		throw new Error(result.error || '[Offscreen Step 3] Conversion failed in sandbox (unknown error)');
 	}
 
+	log(`Conversion successful, result size: ${formatBytes(result.data?.length || 0)}`);
+
 	// 4. Save result to IndexedDB
-	console.log('Offscreen: Saving result to IndexedDB');
+	log('Saving result to IndexedDB...');
 	const resultKey = `result_${requestId}`;
 	const resultData = {
 		success: true,
@@ -133,7 +163,9 @@ async function processConversion(requestId) {
 	};
 
 	await saveImage(resultKey, resultData);
-	console.log('Offscreen: Conversion complete, result saved');
+
+	const totalTime = (performance.now() - startTime).toFixed(0);
+	log(`SUCCESS - Total: ${totalTime}ms, Input: ${formatBytes(dataSize)}, Output: ${formatBytes(result.data?.length || 0)}`);
 }
 
 /**
@@ -141,10 +173,12 @@ async function processConversion(requestId) {
  */
 async function processQueue() {
 	if (isProcessing) {
+		console.log('Offscreen: Queue already processing, skipping');
 		return; // Already processing
 	}
 
 	isProcessing = true;
+	console.log(`Offscreen: Starting queue processing, ${conversionQueue.length} items`);
 
 	while (conversionQueue.length > 0) {
 		const requestId = conversionQueue.shift();
@@ -152,12 +186,17 @@ async function processQueue() {
 
 		try {
 			await processConversion(requestId);
-			console.log(`Offscreen: Successfully converted ${requestId}`);
 		} catch (error) {
-			console.error(`Offscreen: Conversion error for ${requestId}:`, error);
-			// Save error to IndexedDB
+			console.error(`Offscreen [${requestId}]: FAILED -`, error.message);
+			console.error('Offscreen: Full error:', error);
+
+			// Save detailed error to IndexedDB
 			const resultKey = `result_${requestId}`;
-			await saveImage(resultKey, { error: error.message });
+			await saveImage(resultKey, {
+				error: error.message,
+				errorTime: new Date().toISOString(),
+				errorStack: error.stack
+			});
 		}
 	}
 
