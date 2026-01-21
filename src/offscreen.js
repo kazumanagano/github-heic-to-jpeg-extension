@@ -1,11 +1,14 @@
 import { getImage, saveImage } from './db.js';
 
-console.log('Offscreen script loaded (v6 - Sandbox)');
+console.log('Offscreen script loaded (v7 - Queue)');
 
 let sandboxFrame = null;
 let sandboxReady = false;
 let pendingRequests = new Map();
-let conversionCount = 0;
+
+// Conversion queue to prevent sandbox reset during conversion
+let conversionQueue = [];
+let isProcessing = false;
 
 // Reset sandbox iframe (cleanup for memory issues)
 function resetSandbox() {
@@ -14,15 +17,20 @@ function resetSandbox() {
 		sandboxFrame = null;
 	}
 	sandboxReady = false;
-	conversionCount = 0;
 }
 
 // Create sandbox iframe
 function setupSandbox() {
 	return new Promise((resolve) => {
-		// Always reset sandbox for each conversion to prevent memory issues
+		// If sandbox already exists and is ready, reuse it
+		if (sandboxFrame && sandboxReady) {
+			resolve();
+			return;
+		}
+
+		// Reset if exists but not ready
 		if (sandboxFrame) {
-			console.log('Offscreen: Resetting sandbox for new conversion');
+			console.log('Offscreen: Resetting sandbox');
 			resetSandbox();
 		}
 
@@ -68,10 +76,10 @@ window.addEventListener('message', (event) => {
 });
 
 /**
- * HEIC変換を処理する
+ * Process a single conversion
  * @param {string} requestId
  */
-async function handleConversion(requestId) {
+async function processConversion(requestId) {
 	const requestKey = `request_${requestId}`;
 
 	console.log(`Offscreen: Starting conversion for ${requestId}`);
@@ -84,7 +92,7 @@ async function handleConversion(requestId) {
 		throw new Error('No image data found in IndexedDB');
 	}
 
-	// 2. Setup sandbox if needed
+	// 2. Setup sandbox if needed (will reuse existing if ready)
 	await setupSandbox();
 
 	// 3. Send to sandbox for conversion
@@ -115,9 +123,6 @@ async function handleConversion(requestId) {
 		throw new Error(result.error || 'Conversion failed in sandbox');
 	}
 
-	// Increment conversion count
-	conversionCount++;
-
 	// 4. Save result to IndexedDB
 	console.log('Offscreen: Saving result to IndexedDB');
 	const resultKey = `result_${requestId}`;
@@ -131,6 +136,45 @@ async function handleConversion(requestId) {
 	console.log('Offscreen: Conversion complete, result saved');
 }
 
+/**
+ * Process the conversion queue sequentially
+ */
+async function processQueue() {
+	if (isProcessing) {
+		return; // Already processing
+	}
+
+	isProcessing = true;
+
+	while (conversionQueue.length > 0) {
+		const requestId = conversionQueue.shift();
+		console.log(`Offscreen: Processing queue item ${requestId}, ${conversionQueue.length} remaining`);
+
+		try {
+			await processConversion(requestId);
+			console.log(`Offscreen: Successfully converted ${requestId}`);
+		} catch (error) {
+			console.error(`Offscreen: Conversion error for ${requestId}:`, error);
+			// Save error to IndexedDB
+			const resultKey = `result_${requestId}`;
+			await saveImage(resultKey, { error: error.message });
+		}
+	}
+
+	isProcessing = false;
+	console.log('Offscreen: Queue empty, processing complete');
+}
+
+/**
+ * Add a conversion request to the queue
+ * @param {string} requestId
+ */
+function queueConversion(requestId) {
+	console.log(`Offscreen: Queuing conversion for ${requestId}`);
+	conversionQueue.push(requestId);
+	processQueue(); // Start processing if not already
+}
+
 // Message listener (fire-and-forget, no response)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	// Only handle messages targeted at offscreen
@@ -140,20 +184,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 	if (request.action === 'CONVERT_HEIC') {
 		console.log('Offscreen received CONVERT_HEIC for:', request.requestId);
-
-		// Execute conversion (no response sent back)
-		handleConversion(request.requestId)
-			.then(() => {
-				console.log(`Offscreen: Successfully converted ${request.requestId}`);
-			})
-			.catch((error) => {
-				console.error(`Offscreen: Conversion error for ${request.requestId}:`, error);
-				// Save error to IndexedDB
-				const resultKey = `result_${request.requestId}`;
-				saveImage(resultKey, { error: error.message });
-			});
-
-		// Don't wait for async, return immediately
+		queueConversion(request.requestId);
 		return false;
 	}
 });
