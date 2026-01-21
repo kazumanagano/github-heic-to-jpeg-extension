@@ -55,36 +55,90 @@ function removePlaceholder(textarea, placeholder, insertPosition) {
 }
 
 /**
- * Displays an error banner on the page.
+ * Displays an error banner on the page with animation.
  * @param {string} message
  */
 function showErrorBanner(message) {
-	const banner = document.createElement('div');
-	banner.style.position = 'fixed';
-	banner.style.top = '0';
-	banner.style.left = '0';
-	banner.style.width = '100%';
-	banner.style.backgroundColor = '#ff4444';
-	banner.style.color = 'white';
-	banner.style.textAlign = 'center';
-	banner.style.padding = '10px';
-	banner.style.zIndex = '999999';
-	banner.style.fontWeight = 'bold';
-	banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-	banner.textContent = message;
+	// Remove existing error banners first
+	const existingBanners = document.querySelectorAll('[data-heic-error-banner]');
+	existingBanners.forEach(b => b.remove());
 
+	// Add keyframes for animation (once)
+	if (!document.getElementById('heic-error-styles')) {
+		const style = document.createElement('style');
+		style.id = 'heic-error-styles';
+		style.textContent = `
+			@keyframes heicErrorSlideIn {
+				from { transform: translateY(-100%); opacity: 0; }
+				to { transform: translateY(0); opacity: 1; }
+			}
+			@keyframes heicErrorPulse {
+				0%, 100% { box-shadow: 0 4px 12px rgba(255,0,0,0.3); }
+				50% { box-shadow: 0 4px 20px rgba(255,0,0,0.6); }
+			}
+		`;
+		document.head.appendChild(style);
+	}
+
+	const banner = document.createElement('div');
+	banner.setAttribute('data-heic-error-banner', 'true');
+	banner.style.cssText = `
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+		color: white;
+		text-align: center;
+		padding: 16px 20px;
+		z-index: 2147483647;
+		font-weight: bold;
+		font-size: 14px;
+		box-shadow: 0 4px 12px rgba(255,0,0,0.3);
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+		animation: heicErrorSlideIn 0.3s ease-out, heicErrorPulse 1.5s ease-in-out 0.3s 5;
+	`;
+
+	// Warning icon
+	const icon = document.createElement('span');
+	icon.textContent = '⚠️ ';
+	icon.style.marginRight = '8px';
+	icon.style.fontSize = '16px';
+	banner.appendChild(icon);
+
+	// Message text
+	const text = document.createElement('span');
+	text.textContent = message;
+	banner.appendChild(text);
+
+	// Close button
 	const closeBtn = document.createElement('button');
 	closeBtn.textContent = '✕';
-	closeBtn.style.marginLeft = '20px';
-	closeBtn.style.background = 'none';
-	closeBtn.style.border = 'none';
-	closeBtn.style.color = 'white';
-	closeBtn.style.cursor = 'pointer';
-	closeBtn.style.fontSize = '16px';
+	closeBtn.style.cssText = `
+		margin-left: 20px;
+		background: rgba(255,255,255,0.2);
+		border: none;
+		color: white;
+		cursor: pointer;
+		font-size: 14px;
+		padding: 4px 10px;
+		border-radius: 4px;
+		transition: background 0.2s;
+	`;
+	closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(255,255,255,0.3)';
+	closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
 	closeBtn.onclick = () => banner.remove();
 	banner.appendChild(closeBtn);
 
 	document.body.prepend(banner);
+
+	// Auto-remove after 30 seconds
+	setTimeout(() => {
+		if (banner.parentNode) {
+			banner.style.animation = 'heicErrorSlideIn 0.3s ease-out reverse';
+			setTimeout(() => banner.remove(), 300);
+		}
+	}, 30000);
 }
 
 /**
