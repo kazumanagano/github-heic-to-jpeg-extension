@@ -1,6 +1,16 @@
 import heic2any from 'heic2any';
 
-console.log('Sandbox: Script loaded, heic2any type:', typeof heic2any);
+// Send logs to parent (offscreen) so they appear in the same console
+function logToParent(message, level = 'log') {
+	console.log(message); // Local console too
+	window.parent.postMessage({
+		action: 'SANDBOX_LOG',
+		level: level,
+		message: message
+	}, '*');
+}
+
+logToParent(`Sandbox: Script loaded, heic2any type: ${typeof heic2any}`);
 
 /**
  * BlobをBase64文字列に変換する
@@ -62,7 +72,7 @@ function formatBytes(bytes) {
 
 // Listen for messages from parent (offscreen.html)
 window.addEventListener('message', async (event) => {
-	console.log('Sandbox received message:', event.data);
+	logToParent(`Sandbox received message: ${JSON.stringify(event.data?.action)}`);
 
 	if (event.data.action === 'CONVERT_HEIC') {
 		const { base64Data, fileName, requestId } = event.data;
@@ -72,7 +82,7 @@ window.addEventListener('message', async (event) => {
 
 		// Prevent duplicate conversions
 		if (isConverting) {
-			console.warn('Sandbox: Already converting, ignoring duplicate request:', requestId);
+			logToParent(`Sandbox: Already converting, ignoring duplicate request: ${requestId}`, 'warn');
 			return;
 		}
 
@@ -81,7 +91,7 @@ window.addEventListener('message', async (event) => {
 		const logStep = (step, details = '') => {
 			const elapsed = (performance.now() - stepStartTime).toFixed(0);
 			const total = (performance.now() - startTime).toFixed(0);
-			console.log(`Sandbox [${requestId}]: ${step} (${elapsed}ms, total: ${total}ms) ${details}`);
+			logToParent(`Sandbox [${requestId}]: ${step} (${elapsed}ms, total: ${total}ms) ${details}`);
 			stepStartTime = performance.now();
 		};
 
@@ -102,13 +112,13 @@ window.addEventListener('message', async (event) => {
 			const timeoutMs = blob.size > 10 * 1024 * 1024 ? 60000 : 30000; // 60s for >10MB
 			logStep(`Starting heic2any (${timeoutMs/1000}s timeout)`, `Input: ${formatBytes(blob.size)}, heic2any=${typeof heic2any}`);
 
-			console.log(`Sandbox [${requestId}]: Calling heic2any()...`);
+			logToParent(`Sandbox [${requestId}]: Calling heic2any()...`);
 			const conversionPromise = heic2any({
 				blob: blob,
 				toType: 'image/jpeg',
 				quality: 0.8,
 			});
-			console.log(`Sandbox [${requestId}]: heic2any() returned promise, awaiting...`);
+			logToParent(`Sandbox [${requestId}]: heic2any() returned promise, awaiting...`);
 
 			const conversionResult = await withTimeout(
 				conversionPromise,
@@ -136,15 +146,15 @@ window.addEventListener('message', async (event) => {
 			}, '*');
 
 			const totalTime = (performance.now() - startTime).toFixed(0);
-			console.log(`Sandbox [${requestId}]: SUCCESS - Total time: ${totalTime}ms, Input: ${formatBytes(blobSize)}, Output: ${formatBytes(resultBlob.size)}`);
+			logToParent(`Sandbox [${requestId}]: SUCCESS - Total: ${totalTime}ms, Input: ${formatBytes(blobSize)}, Output: ${formatBytes(resultBlob.size)}`);
 
 		} catch (error) {
 			const totalTime = (performance.now() - startTime).toFixed(0);
 			const errorMsg = getErrorMessage(error);
 			const detailedError = `[File: ${fileName}, Size: ${formatBytes(blobSize)}, Time: ${totalTime}ms] ${errorMsg}`;
 
-			console.error(`Sandbox [${requestId}]: FAILED after ${totalTime}ms -`, detailedError);
-			console.error('Sandbox: Full error object:', error);
+			logToParent(`Sandbox [${requestId}]: FAILED after ${totalTime}ms - ${detailedError}`, 'error');
+			logToParent(`Sandbox: Full error: ${error}`, 'error');
 
 			event.source.postMessage({
 				action: 'CONVERT_RESULT',
@@ -160,4 +170,4 @@ window.addEventListener('message', async (event) => {
 
 // Signal that sandbox is ready
 window.parent.postMessage({ action: 'SANDBOX_READY' }, '*');
-console.log('Sandbox: Ready');
+logToParent('Sandbox: Ready');

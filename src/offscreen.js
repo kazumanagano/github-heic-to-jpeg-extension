@@ -71,8 +71,21 @@ function setupSandbox() {
 	});
 }
 
-// Listen for results from sandbox
+// Listen for messages from sandbox
 window.addEventListener('message', (event) => {
+	// Relay sandbox logs to this console
+	if (event.data.action === 'SANDBOX_LOG') {
+		const { level, message } = event.data;
+		if (level === 'error') {
+			console.error('[Sandbox→]', message);
+		} else if (level === 'warn') {
+			console.warn('[Sandbox→]', message);
+		} else {
+			console.log('[Sandbox→]', message);
+		}
+		return;
+	}
+
 	if (event.data.action === 'CONVERT_RESULT') {
 		const { requestId, success, data, fileName, error } = event.data;
 		console.log('Offscreen: Received result from sandbox for:', requestId);
