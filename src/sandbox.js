@@ -108,17 +108,37 @@ window.addEventListener('message', async (event) => {
 				throw new Error('[Step 1] Empty blob received - base64 data may be corrupted');
 			}
 
+			// Debug: Check blob header (HEIC files start with ftyp box)
+			const headerBytes = await blob.slice(0, 12).arrayBuffer();
+			const header = new Uint8Array(headerBytes);
+			const headerHex = Array.from(header).map(b => b.toString(16).padStart(2, '0')).join(' ');
+			logToParent(`Sandbox [${requestId}]: Blob header (first 12 bytes): ${headerHex}`);
+
+			// Check if it looks like a valid HEIC file (should contain 'ftyp' at offset 4)
+			const ftyp = String.fromCharCode(header[4], header[5], header[6], header[7]);
+			logToParent(`Sandbox [${requestId}]: File signature: "${ftyp}" (expected: "ftyp")`);
+
 			// Step 2: Convert HEIC to JPEG with timeout
 			const timeoutMs = blob.size > 10 * 1024 * 1024 ? 60000 : 30000; // 60s for >10MB
 			logStep(`Starting heic2any (${timeoutMs/1000}s timeout)`, `Input: ${formatBytes(blob.size)}, heic2any=${typeof heic2any}`);
 
 			logToParent(`Sandbox [${requestId}]: Calling heic2any()...`);
-			const conversionPromise = heic2any({
-				blob: blob,
-				toType: 'image/jpeg',
-				quality: 0.8,
-			});
-			logToParent(`Sandbox [${requestId}]: heic2any() returned promise, awaiting...`);
+
+			// Wrap heic2any with additional error handling
+			let conversionPromise;
+			try {
+				conversionPromise = heic2any({
+					blob: blob,
+					toType: 'image/jpeg',
+					quality: 0.8,
+				});
+				logToParent(`Sandbox [${requestId}]: heic2any() returned promise successfully`);
+			} catch (syncError) {
+				logToParent(`Sandbox [${requestId}]: heic2any() threw sync error: ${syncError}`, 'error');
+				throw syncError;
+			}
+
+			logToParent(`Sandbox [${requestId}]: Awaiting heic2any promise...`);
 
 			const conversionResult = await withTimeout(
 				conversionPromise,
