@@ -1,4 +1,14 @@
-import heic2any from 'heic2any';
+console.log('Sandbox: Script starting...');
+
+let heic2any;
+try {
+	console.log('Sandbox: Importing heic2any...');
+	const module = await import('heic2any');
+	heic2any = module.default;
+	console.log('Sandbox: heic2any imported successfully');
+} catch (e) {
+	console.error('Sandbox: Failed to import heic2any:', e);
+}
 
 console.log('Sandbox script loaded');
 
@@ -102,12 +112,22 @@ window.addEventListener('message', async (event) => {
 			const timeoutMs = blob.size > 10 * 1024 * 1024 ? 60000 : 30000; // 60s for >10MB
 			logStep(`Starting heic2any conversion (${timeoutMs/1000}s timeout)...`, `Input: ${formatBytes(blob.size)}`);
 
+			// Check if heic2any is available
+			if (!heic2any) {
+				throw new Error('[Step 2] heic2any library not loaded - import may have failed');
+			}
+			logStep('heic2any library confirmed available');
+
+			console.log(`Sandbox [${requestId}]: Calling heic2any() now...`);
+			const conversionPromise = heic2any({
+				blob: blob,
+				toType: 'image/jpeg',
+				quality: 0.8,
+			});
+			console.log(`Sandbox [${requestId}]: heic2any() called, waiting for result...`);
+
 			const conversionResult = await withTimeout(
-				heic2any({
-					blob: blob,
-					toType: 'image/jpeg',
-					quality: 0.8,
-				}),
+				conversionPromise,
 				timeoutMs,
 				`heic2any conversion (input: ${formatBytes(blob.size)})`
 			);
