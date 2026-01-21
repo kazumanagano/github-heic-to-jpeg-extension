@@ -32,34 +32,73 @@ function getErrorMessage(error) {
 	return 'Unknown error';
 }
 
+/**
+ * タイムアウト付きでPromiseを実行する
+ * @param {Promise} promise
+ * @param {number} timeoutMs
+ * @param {string} operationName
+ * @returns {Promise}
+ */
+function withTimeout(promise, timeoutMs, operationName) {
+	return Promise.race([
+		promise,
+		new Promise((_, reject) =>
+			setTimeout(() => reject(new Error(`${operationName} timed out after ${timeoutMs}ms`)), timeoutMs)
+		)
+	]);
+}
+
+// Track if conversion is in progress to prevent duplicate processing
+let isConverting = false;
+
 // Listen for messages from parent (offscreen.html)
 window.addEventListener('message', async (event) => {
 	console.log('Sandbox received message:', event.data);
 
 	if (event.data.action === 'CONVERT_HEIC') {
-		try {
-			const { base64Data, fileName, requestId } = event.data;
+		const { base64Data, fileName, requestId } = event.data;
 
+		// Prevent duplicate conversions
+		if (isConverting) {
+			console.warn('Sandbox: Already converting, ignoring duplicate request:', requestId);
+			return;
+		}
+
+		isConverting = true;
+
+		try {
 			// Convert base64 to blob
 			console.log('Sandbox: Fetching blob from base64...');
 			const response = await fetch(base64Data);
 			const blob = await response.blob();
-			console.log('Sandbox: Blob fetched. Size:', blob.size);
+			console.log('Sandbox: Blob fetched. Size:', blob.size, 'Type:', blob.type);
 
-			// Convert HEIC to JPEG
-			console.log('Sandbox: Starting heic2any conversion...');
-			const conversionResult = await heic2any({
-				blob: blob,
-				toType: 'image/jpeg',
-				quality: 0.8,
-			});
-			console.log('Sandbox: Conversion complete');
+			// Validate blob
+			if (blob.size === 0) {
+				throw new Error('Empty blob received');
+			}
+
+			// Convert HEIC to JPEG with timeout (30 seconds)
+			console.log('Sandbox: Starting heic2any conversion (30s timeout)...');
+			const conversionResult = await withTimeout(
+				heic2any({
+					blob: blob,
+					toType: 'image/jpeg',
+					quality: 0.8,
+				}),
+				30000,
+				'heic2any conversion'
+			);
+			console.log('Sandbox: heic2any conversion complete');
 
 			// heic2any may return array
 			const resultBlob = Array.isArray(conversionResult) ? conversionResult[0] : conversionResult;
+			console.log('Sandbox: Result blob size:', resultBlob.size);
 
 			// Convert back to base64
+			console.log('Sandbox: Converting result to base64...');
 			const resultBase64 = await blobToBase64(resultBlob);
+			console.log('Sandbox: Base64 conversion complete, length:', resultBase64.length);
 
 			// Send result back to parent
 			event.source.postMessage({
@@ -69,16 +108,19 @@ window.addEventListener('message', async (event) => {
 				data: resultBase64,
 				fileName: fileName.replace(/\.heic$/i, '.jpg')
 			}, '*');
+			console.log('Sandbox: Result sent for', requestId);
 
 		} catch (error) {
 			const errorMsg = getErrorMessage(error);
-			console.error('Sandbox conversion error:', errorMsg);
+			console.error('Sandbox conversion error for', requestId, ':', errorMsg);
 			event.source.postMessage({
 				action: 'CONVERT_RESULT',
-				requestId: event.data.requestId,
+				requestId: requestId,
 				success: false,
 				error: errorMsg
 			}, '*');
+		} finally {
+			isConverting = false;
 		}
 	}
 });
